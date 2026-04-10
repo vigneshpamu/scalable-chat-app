@@ -1,56 +1,55 @@
-import { Server } from 'socket.io'
-import Redis from 'ioredis'
-import prismaClient from './prisma'
-import { produceMessage } from './kafka'
+import { Server } from "socket.io";
+import Redis from "ioredis";
+import prismaClient from "./prisma";
+import { produceMessage } from "./kafka";
 
 const pub = new Redis({
   host: process.env.REDIS_HOST!,
   port: parseInt(process.env.REDIS_PORT!, 10),
-  username: process.env.REDIS_USERNAME!,
-  password: process.env.REDIS_PASSWORD!,
-})
+});
 
 const sub = new Redis({
   host: process.env.REDIS_HOST!,
   port: parseInt(process.env.REDIS_PORT!, 10),
-  username: process.env.REDIS_USERNAME!,
-  password: process.env.REDIS_PASSWORD!,
-})
+});
 
 class SocketService {
-  private _io: Server
+  private _io: Server;
 
   constructor() {
-    console.log('Init Socket Service...')
+    console.log("Init Socket Service...");
     this._io = new Server({
       cors: {
-        allowedHeaders: ['*'],
-        origin: '*',
+        allowedHeaders: ["*"],
+        origin: "*",
       },
-    })
+    });
 
-    sub.subscribe(process.env.KAFKA_TOPIC!)
+    sub.subscribe(process.env.KAFKA_TOPIC!);
   }
 
   public initListeners() {
-    const io = this._io
+    const io = this._io;
 
-    console.log('Init Socket Listeners...')
+    console.log("Init Socket Listeners...");
 
-    io.on('connect', (socket) => {
-      console.log(`New socket connected`, socket.id)
+    io.on("connect", (socket) => {
+      console.log(`New socket connected`, socket.id);
 
-      socket.on('event:message', async ({ message }: { message: string }) => {
-        console.log('New Message received', message)
+      socket.on(
+        "event:message",
+        async (data: { message: string; sender: string }) => {
+          console.log("New Message received", data);
 
-        await pub.publish(process.env.KAFKA_TOPIC!, JSON.stringify({ message }))
-      })
-    })
+          await pub.publish(process.env.KAFKA_TOPIC!, JSON.stringify(data));
+        },
+      );
+    });
 
-    sub.on('message', async (channel, message) => {
+    sub.on("message", async (channel, message) => {
       if (channel === process.env.KAFKA_TOPIC!) {
-        console.log('new message from redis', message)
-        io.emit('message', message)
+        console.log("new message from redis", message);
+        io.emit("message", message);
 
         // await prismaClient.message.create({
         //   data: {
@@ -58,15 +57,15 @@ class SocketService {
         //   },
         // })
 
-        await produceMessage(message)
-        console.log('Message Produced to Kafka Broker')
+        await produceMessage(message);
+        console.log("Message Produced to Kafka Broker");
       }
-    })
+    });
   }
 
   get io() {
-    return this._io
+    return this._io;
   }
 }
 
-export default SocketService
+export default SocketService;
